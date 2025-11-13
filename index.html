@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu Creator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/qrcode@1.5.3/index.js"></script>
+  <style>
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .print-content,
+      .print-content * {
+        visibility: visible;
+      }
+      .print-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Lucide Icons as SVG components
+    const PlusIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    );
+
+    const TrashIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    );
+
+    const MenuIcon = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    );
+
+    const QrCodeIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+      </svg>
+    );
+
+    const DownloadIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    );
+
+    const PrinterIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+    );
+
+    const PaletteIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <circle cx="12" cy="8" r="1.5"></circle>
+        <circle cx="8" cy="12" r="1.5"></circle>
+        <circle cx="16" cy="12" r="1.5"></circle>
+      </svg>
+    );
+
+    const EyeIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    );
+
+    const TEMPLATE_KEYS = ['classic', 'modern', 'elegant', 'christmas', 'summer', 'autumn'];
+
+    function App() {
+      const [currentView, setCurrentView] = useState('create');
+      const [restaurantName, setRestaurantName] = useState('Il Mio Ristorante');
+      const [selectedTemplate, setSelectedTemplate] = useState('classic');
+      const [templates, setTemplates] = useState({});
+      const [categories, setCategories] = useState([
+        {
+          id: 1,
+          name: 'Antipasti',
+          items: [
+            { id: 1, name: 'Bruschetta', description: 'Pomodoro fresco e basilico', price: '6.00' }
+          ]
+        }
+      ]);
+      const [scanCount, setScanCount] = useState(0);
+      const [qrUrl, setQrUrl] = useState('');
+
+      // Carica template da file JSON separati
+      useEffect(() => {
+        const loadTemplates = async () => {
+          const loaded = {};
+          for (const key of TEMPLATE_KEYS) {
+            try {
+              const response = await fetch(`./templates/${key}.json`);
+              if (response.ok) {
+                loaded[key] = await response.json();
+              } else {
+                console.error(`Template ${key} non trovato`);
+              }
+            } catch (e) {
+              console.error(`Errore caricando template ${key}:`, e);
+            }
+          }
+          setTemplates(loaded);
+        };
+        loadTemplates();
+      }, []);
+
+      const template = templates[selectedTemplate] || {
+        name: 'Classico',
+        primaryColor: '#1A1A1A',
+        secondaryColor: '#666666',
+        backgroundColor: '#FFFFFF',
+        fontFamily: 'serif'
+      };
+
+      // Genera QR Code
+      useEffect(() => {
+        if (currentView === 'preview') {
+          const menuUrl = `https://raydalessandro.github.io/menu-creator/menu.html`;
+          try {
+            const dataUrl = QRCode.toDataURL(menuUrl, {
+              errorCorrectionLevel: 'H',
+              width: 200,
+              margin: 2
+            });
+            setQrUrl(dataUrl);
+          } catch (e) {
+            console.error('Error generating QR code:', e);
+            setQrUrl('');
+          }
+        }
+      }, [currentView, restaurantName]);
+
+      const addCategory = () => {
+        setCategories([...categories, {
+          id: Date.now(),
+          name: 'Nuova Categoria',
+          items: []
+        }]);
+      };
+
+      const deleteCategory = (categoryId) => {
+        setCategories(categories.filter(cat => cat.id !== categoryId));
+      };
+
+      const updateCategoryName = (categoryId, newName) => {
+        setCategories(categories.map(cat => 
+          cat.id === categoryId ? { ...cat, name: newName } : cat
+        ));
+      };
+
+      const addItem = (categoryId) => {
+        setCategories(categories.map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              items: [...cat.items, {
+                id: Date.now(),
+                name: 'Nuovo Piatto',
+                description: '',
+                price: '0.00'
+              }]
+            };
+          }
+          return cat;
+        }));
+      };
+
+      const deleteItem = (categoryId, itemId) => {
+        setCategories(categories.map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              items: cat.items.filter(item => item.id !== itemId)
+            };
+          }
+          return cat;
+        }));
+      };
+
+      const updateItem = (categoryId, itemId, field, value) => {
+        setCategories(categories.map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              items: cat.items.map(item => 
+                item.id === itemId ? { ...item, [field]: value } : item
+              )
+            };
+          }
+          return cat;
+        }));
+      };
+
+      const printPDF = () => {
+        window.print();
+      };
+
+      const downloadQR = () => {
+        if (qrUrl) {
+          const link = document.createElement('a');
+          link.download = 'menu-qr-code.png';
+          link.href = qrUrl;
+          link.click();
+        }
+      };
+
+      const simulateScan = () => {
+        setScanCount(prev => prev + 1);
+      };
+
+      const downloadDigitalMenu = () => {
+        const menuContent = `
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${restaurantName} - Menu Digitale</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: ${template.backgroundColor}; color: ${template.primaryColor}; font-family: ${template.fontFamily}; }
+  </style>
+</head>
+<body class="p-4 md:p-8 max-w-3xl mx-auto">
+  <h1 class="text-3xl md:text-4xl font-bold text-center mb-8" style="color: ${template.primaryColor};">
+    ${restaurantName}
+  </h1>
+  ${categories.map((category, idx) => `
+    <div class="${idx > 0 ? 'mt-8' : ''}">
+      <h2 class="text-xl md:text-2xl font-bold mb-4 pb-2 border-b-2" style="color: ${template.primaryColor}; border-color: ${template.secondaryColor};">
+        ${category.name}
+      </h2>
+      <div class="space-y-4">
+        ${category.items.map(item => `
+          <div class="flex justify-between gap-4">
+            <div class="flex-1">
+              <div class="font-semibold text-base md:text-lg">${item.name}</div>
+              ${item.description ? `<div class="text-sm mt-1" style="color: ${template.secondaryColor};">${item.description}</div>` : ''}
+            </div>
+            <div class="font-bold text-base md:text-lg whitespace-nowrap">€${item.price}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('')}
+</body>
+</html>
+        `;
+        const blob = new Blob([menuContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = 'menu.html';
+        link.href = url;
+        link.click();
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50">
+          {/* Header */}
+          <header className="bg-white border-b border-gray-200 px-6 py-4 no-print">
+            <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <MenuIcon />
+                <h1 className="text-2xl font-bold text-gray-900">Menu Creator</h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentView('create')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    currentView === 'create' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Crea Menu
+                </button>
+                <button
+                  onClick={() => setCurrentView('preview')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    currentView === 'preview' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Genera & Stampa
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="max-w-7xl mx-auto px-6 py-8">
+            {currentView === 'create' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Settings */}
+                <div className="space-y-6">
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <MenuIcon />
+                      Nome Ristorante
+                    </h2>
+                    <input
+                      type="text"
+                      value={restaurantName}
+                      onChange={(e) => setRestaurantName(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Il Mio Ristorante"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <PaletteIcon />
+                      Template
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(templates).map(([key, temp]) => (
+                        <button
+                          key={key}
+                          onClick={() => setSelectedTemplate(key)}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            selectedTemplate === key
+                              ? 'border-blue-600 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div 
+                            className="w-full h-12 rounded mb-2"
+                            style={{ backgroundColor: temp.primaryColor }}
+                          />
+                          <div className="text-sm font-medium text-gray-900">
+                            {temp.name}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <EyeIcon />
+                      Statistiche
+                    </h2>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-blue-600 mb-2">
+                        {scanCount}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Scansioni QR Code
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Menu Editor */}
+                <div className="lg:col-span-2 space-y-4">
+                  {categories.map((category) => (
+                    <div key={category.id} className="bg-white rounded-lg border border-gray-200 p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <input
+                          type="text"
+                          value={category.name}
+                          onChange={(e) => updateCategoryName(category.id, e.target.value)}
+                          className="flex-1 text-xl font-bold px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={() => addItem(category.id)}
+                          className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <PlusIcon />
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(category.id)}
+                          className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {category.items.map((item) => (
+                          <div key={item.id} className="flex gap-3 items-start p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => updateItem(category.id, item.id, 'name', e.target.value)}
+                                className="w-full px-3 py-1 text-sm font-medium border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Nome piatto"
+                              />
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => updateItem(category.id, item.id, 'description', e.target.value)}
+                                className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Descrizione"
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              value={item.price}
+                              onChange={(e) => updateItem(category.id, item.id, 'price', e.target.value)}
+                              className="w-20 px-3 py-1 text-sm font-medium text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="0.00"
+                            />
+                            <button
+                              onClick={() => deleteItem(category.id, item.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={addCategory}
+                    className="w-full py-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-600 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <PlusIcon />
+                    Aggiungi Categoria
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Actions */}
+                <div className="space-y-6 no-print">
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <QrCodeIcon />
+                      QR Code Menu
+                    </h2>
+                    <div className="flex justify-center mb-4">
+                      {qrUrl && <img src={qrUrl} alt="QR Code" width="200" />}
+                    </div>
+                    <button
+                      onClick={downloadQR}
+                      className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <DownloadIcon />
+                      Scarica QR Code
+                    </button>
+                    <button
+                      onClick={downloadDigitalMenu}
+                      className="w-full mt-2 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <DownloadIcon />
+                      Scarica Menu Digitale (HTML)
+                    </button>
+                    <button
+                      onClick={simulateScan}
+                      className="w-full mt-2 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      Simula Scansione
+                    </button>
+                  </div>
+
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <PrinterIcon />
+                      Stampa
+                    </h2>
+                    <button
+                      onClick={printPDF}
+                      className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <PrinterIcon />
+                      Stampa Menu PDF
+                    </button>
+                    <p className="text-xs text-gray-600 mt-3">
+                      Usa "Salva come PDF" per salvare il menu
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold mb-4">Statistiche</h2>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Scansioni</span>
+                        <span className="text-2xl font-bold text-blue-600">{scanCount}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Categorie</span>
+                        <span className="text-lg font-semibold">{categories.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Piatti</span>
+                        <span className="text-lg font-semibold">
+                          {categories.reduce((sum, cat) => sum + cat.items.length, 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Menu Preview */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 print-content">
+                    <div 
+                      style={{ 
+                        backgroundColor: template.backgroundColor,
+                        color: template.primaryColor,
+                        fontFamily: template.fontFamily
+                      }}
+                      className="p-8 rounded-lg"
+                    >
+                      <h1 
+                        className="text-4xl font-bold text-center mb-8"
+                        style={{ color: template.primaryColor }}
+                      >
+                        {restaurantName}
+                      </h1>
+
+                      {categories.map((category, idx) => (
+                        <div key={category.id} className={idx > 0 ? 'mt-8' : ''}>
+                          <h2 
+                            className="text-2xl font-bold mb-4 pb-2 border-b-2"
+                            style={{ 
+                              color: template.primaryColor,
+                              borderColor: template.secondaryColor
+                            }}
+                          >
+                            {category.name}
+                          </h2>
+                          <div className="space-y-4">
+                            {category.items.map((item) => (
+                              <div key={item.id} className="flex justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-lg">
+                                    {item.name}
+                                  </div>
+                                  {item.description && (
+                                    <div 
+                                      className="text-sm mt-1"
+                                      style={{ color: template.secondaryColor }}
+                                    >
+                                      {item.description}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="font-bold text-lg whitespace-nowrap">
+                                  €{item.price}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="mt-12 pt-8 border-t text-center text-sm" 
+                        style={{ borderColor: template.secondaryColor, color: template.secondaryColor }}>
+                        <p>Scansiona il QR code per il menu aggiornato</p>
+                        {qrUrl && <img src={qrUrl} alt="QR Code" className="mx-auto mt-4" width="150" />}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+                  </html>
